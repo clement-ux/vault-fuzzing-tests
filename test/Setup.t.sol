@@ -136,6 +136,7 @@ abstract contract Setup is Base {
         usdc.mint(alice, DEAD_AMOUNT);
         vault.mint(DEAD_AMOUNT);
         ousd.transfer(dead, DEAD_AMOUNT * 1e12); // Convert to 18 decimals
+        vm.stopPrank();
     }
 
     //////////////////////////////////////////////////////
