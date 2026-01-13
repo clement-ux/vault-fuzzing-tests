@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.31;
 
+// Solmate
 import {MockERC20} from "@solmate/test/utils/mocks/MockERC20.sol";
 
+// Origin Dollar
 import {OUSD} from "@origin-dollar/token/OUSD.sol";
 import {OUSDVault} from "@origin-dollar/vault/OUSDVault.sol";
 import {OUSDProxy} from "@origin-dollar/proxies/Proxies.sol";
 import {VaultProxy} from "@origin-dollar/proxies/Proxies.sol";
 import {VaultInitializer} from "@origin-dollar/vault/VaultInitializer.sol";
 
+// Internal
 import {MockStrategyAMO} from "src/MockStrategyAMO.sol";
 import {MockStrategyTrad} from "src/MockStrategyTrad.sol";
 
+// Test
 import {Base} from "test/Base.t.sol";
 
 /// @title Setup
@@ -24,7 +28,7 @@ import {Base} from "test/Base.t.sol";
 ///         5. System initialization and configuration
 ///         6. Address labeling for improved traceability
 ///         No test logic should be implemented here, only setup procedures.
-contract Setup is Base {
+abstract contract Setup is Base {
     ////////////////////////////////////////////////////
     /// --- SETUP
     ////////////////////////////////////////////////////
@@ -146,6 +150,4 @@ contract Setup is Base {
         vm.label(address(strategyAMO), "Strategy AMO");
         vm.label(address(strategyTrad), "Strategy Trad");
     }
-
-    function test() public {}
 }
