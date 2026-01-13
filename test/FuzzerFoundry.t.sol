@@ -13,5 +13,36 @@ import {Properties} from "test/Properties.t.sol";
 ///         - Each invariant function represents a critical system property to maintain
 ///         - Fuzzer will call targeted handlers randomly and check invariants after each call
 contract FuzzerFoundry is Properties {
-    function test() public {}
+    //////////////////////////////////////////////////////
+    /// --- SETUP
+    //////////////////////////////////////////////////////
+    function setUp() public virtual override {
+        super.setUp();
+
+        // --- Setup Fuzzer target ---
+        // Setup target
+        targetContract(address(this));
+
+        // Add selectors
+
+        bytes4[] memory selectors = new bytes4[](9);
+        // Setter handlers
+        selectors[0] = this.handlerSetAutoAllocateThreshold.selector;
+        selectors[1] = this.handlerSetDripDuration.selector;
+        selectors[2] = this.handlerSetMaxSupplyDiff.selector;
+        selectors[3] = this.handlerSetRebaseRateMax.selector;
+        selectors[4] = this.handlerSetTrusteeFeeBps.selector;
+        selectors[5] = this.handlerSetRebaseThreshold.selector;
+        selectors[6] = this.handlerSetVaultBuffer.selector;
+        selectors[7] = this.handlerSetWithdrawalClaimDelay.selector;
+
+        // Mint & Redeem handlers
+        selectors[8] = this.handlerMint.selector;
+
+        // Target selectors
+        targetSelector(FuzzSelector({addr: address(this), selectors: selectors}));
+        targetSender(makeAddr("FuzzerSender"));
+    }
+
+    function invariantA() public view {}
 }
