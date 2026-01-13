@@ -27,6 +27,9 @@ abstract contract Base is Test {
     ////////////////////////////////////////////////////
     /// --- CONSTANTS
     ////////////////////////////////////////////////////
+    /// @notice Enable or disable logs during tests
+    /// @dev Having it enable slows down tests.
+    bool internal constant ENABLE_LOGS = true;
     /// @notice Initial USDC balance used to mint OUSD to dead address
     uint256 internal constant DEAD_AMOUNT = 100e6;
 
@@ -35,14 +38,14 @@ abstract contract Base is Test {
     ////////////////////////////////////////////////////
     // Users
     address public dead = makeAddr("dead");
-    address public alice = makeAddr("alice");
-    address public bobby = makeAddr("bobby");
-    address public cathy = makeAddr("cathy");
-    address public david = makeAddr("david");
-    address public deployer = makeAddr("deployer");
-    address public operator = makeAddr("operator");
-    address public governor = makeAddr("governor");
-    address public treasury = makeAddr("treasury");
+    address public alice = makeAddr("Alice");
+    address public bobby = makeAddr("Bobby");
+    address public cathy = makeAddr("Cathy");
+    address public david = makeAddr("David");
+    address public deployer = makeAddr("Deployer");
+    address public operator = makeAddr("Operator");
+    address public governor = makeAddr("Governor");
+    address public treasury = makeAddr("Treasury");
     address[] public users;
 
     ////////////////////////////////////////////////////
