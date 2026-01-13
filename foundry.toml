@@ -19,6 +19,9 @@ remappings = [
 [lint]
 lint_on_build = false
 
+[fmt]
+line_length = 120
+
 [invariant]
 runs = 20
 depth = 500
