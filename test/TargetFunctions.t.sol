@@ -4,8 +4,12 @@ pragma solidity 0.8.31;
 // Foundry
 import {console} from "@forge-std/console.sol";
 
+// Origin Dollar
+import {OUSDVault} from "@origin-dollar/vault/OUSDVault.sol";
+
 // Library
 import {Logger} from "src/Logger.sol";
+import {Getter} from "src/Getter.sol";
 
 // Test imports
 import {Setup} from "test/Setup.t.sol";
@@ -26,11 +30,12 @@ abstract contract TargetFunctions is Setup {
     //
     // --- Liquidity Management
     // [ ] rebase
-    // [ ] allocate
-    // [ ] depositToStrategy
+    // [x] allocate
+    // [x] depositToStrategy
     // [ ] withdrawAllFromStrategy
     // [ ] withdrawAllFromStrategies
     // [ ] withdrawFromStrategy
+    // [x] simulateYieldOnStrategy
     //
     // --- Setters
     // [x] setAutoAllocateThreshold
@@ -45,6 +50,7 @@ abstract contract TargetFunctions is Setup {
     using Logger for uint48;
     using Logger for uint64;
     using Logger for uint256;
+    using Getter for OUSDVault;
 
     ////////////////////////////////////////////////////
     /// --- Mint & Redeem Handlers
@@ -55,7 +61,7 @@ abstract contract TargetFunctions is Setup {
     /// @dev amount is uint48 because it can represent up to ~281m with 6 decimals (USDC)
     function handlerMint(uint48 amount, uint8 random) public {
         // Ensure amount is greater than 0 (restricted by vault)
-        vm.assume(amount > 0);
+        amount = uint48(_bound(amount, 1, type(uint48).max));
 
         // Select random user
         address user = users[random % users.length];
@@ -86,6 +92,132 @@ abstract contract TargetFunctions is Setup {
                     " OUSD with ",
                     amount.decimals(6, true, true),
                     " USDC"
+                )
+            )
+        );
+    }
+
+    ////////////////////////////////////////////////////
+    /// --- Liquidity Management Handlers
+    ////////////////////////////////////////////////////
+    /// @notice Handler for allocate function
+    function handlerAllocate() public {
+        // Cache strategy balance before
+        // Allocate always deposits to default strategy (strategyTrad)
+        uint256 strategyBalanceBefore = usdc.balanceOf(address(strategyTrad));
+
+        // Prank as governor and call allocate
+        vm.prank(governor);
+        vault.allocate();
+
+        // Cache strategy balance after
+        uint256 strategyBalanceAfter = usdc.balanceOf(address(strategyTrad));
+
+        // Calculate amount deposited
+        uint256 amountDeposited = strategyBalanceAfter - strategyBalanceBefore;
+
+        // Log allocate info
+        if (!ENABLE_LOGS) return;
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    vm.getLabel(governor),
+                    " -> allocate():                    ",
+                    amountDeposited.decimals(6, true, true),
+                    " USDC"
+                )
+            )
+        );
+    }
+
+    /// @notice Handler for depositToStrategy function
+    /// @param random A random value for fuzzing random strategy
+    /// @param amount The amount to deposit
+    /// @dev amount is uint256 to allow large deposit amounts
+    function handlerDepositToStrategy(uint8 random, uint256 amount) public {
+        // Pick a random strategy
+        address strategy = strategies[random % strategies.length];
+
+        // Get available asset in the vault
+        uint256 availableAsset = vault.availableAsset();
+
+        // Assume there is at least 1 USDC available
+        vm.assume(availableAsset >= 1);
+
+        // Bound amount to available asset
+        amount = _bound(amount, 1, availableAsset);
+
+        // Prepare deposit parameters
+        address[] memory assets = new address[](1);
+        assets[0] = address(usdc);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+        // Prank as operator and call depositToStrategy
+        vm.prank(operator);
+        vault.depositToStrategy(strategy, assets, amounts);
+
+        // Log depositToStrategy info
+        if (!ENABLE_LOGS) return;
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    vm.getLabel(operator),
+                    " -> depositToStrategy():           ",
+                    amount.decimals(6, true, true),
+                    " USDC to: ",
+                    vm.getLabel(strategy)
+                )
+            )
+        );
+    }
+
+    /// @notice Handler for simulateYieldOnStrategy function
+    /// @param random A random value for fuzzing random strategy
+    /// @param amount The amount of yield to simulate
+    /// @dev amount is uint256 to allow large yield amounts
+    function handlerSimuateYieldOnStrategy(uint8 random, uint256 amount) public {
+        // Select random strategy that has at least 20 USDC balance, otherwise skip
+        // 20 USDC is chosen to ensure we can simulate at least 0.05% yield
+        address strategy;
+        uint256 balanceBefore;
+        uint256 len = strategies.length;
+        for (uint256 i = random; i < random + len; i++) {
+            if (usdc.balanceOf(strategies[i % len]) >= 20) {
+                balanceBefore = usdc.balanceOf(strategies[i % len]);
+                strategy = strategies[i % len];
+                break;
+            }
+        }
+
+        // Assume we find a valid strategy
+        vm.assume(strategy != address(0));
+
+        // Max reasonable yield is 5% of the current balance
+        uint256 maxYield = balanceBefore / 20;
+
+        // Bound amount to maxYield
+        amount = _bound(amount, 1, maxYield);
+
+        // Simulate yield on strategy
+        usdc.mint(strategy, amount);
+
+        // Log simulate yield info
+        if (!ENABLE_LOGS) return;
+        // Calculate yield percentage
+        uint256 yieldPct = (amount * 1e18) / balanceBefore;
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    "Fuzzer  ",
+                    " -> simulateYieldOnStrategy():     ",
+                    amount.decimals(6, true, true),
+                    " USDC (+",
+                    yieldPct.decimals(18, true, true),
+                    " %) for: ",
+                    vm.getLabel(strategy)
                 )
             )
         );
@@ -133,8 +265,9 @@ abstract contract TargetFunctions is Setup {
         vm.prank(operator);
         vault.setDripDuration(dripDuration);
 
+        if (!ENABLE_LOGS) return;
         // Log set info
-        if (!ENABLE_LOGS) return; // forgefmt: disable-start
+        // forgefmt: disable-start
         console.log(
             string(
                 abi.encodePacked(
