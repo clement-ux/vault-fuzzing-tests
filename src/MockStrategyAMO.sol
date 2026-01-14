@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.31;
 
+// Solmate
 import {MockERC20} from "@solmate/test/utils/mocks/MockERC20.sol";
 
+// Origin Dollar
 import {OUSDVault} from "@origin-dollar/vault/OUSDVault.sol";
 
 contract MockStrategyAMO {
@@ -31,22 +33,39 @@ contract MockStrategyAMO {
     }
 
     function deposit(address, uint256 amount) public onlyVault {
-        // Mint same amount of asset deposited, simulate OUSD/USDC pool.
-        vault.mintForStrategy(amount * 1e12); // assuming 6 to 18 decimals
+        _adjustEquilibria();
         emit AssetDeposited(amount);
     }
-    function depositAll() public onlyVault {}
+
+    function depositAll() public onlyVault {
+        _adjustEquilibria();
+    }
 
     function withdraw(address, address, uint256 amount) public onlyVault {
+        _adjustEquilibria();
         asset.transfer(address(vault), amount);
-        vault.burnForStrategy(amount * 1e12); // assuming 6 to 18 decimals
         emit AssetWithdrawn(amount);
     }
 
     function withdrawAll() public onlyVault {
+        _adjustEquilibria();
         uint256 balance = asset.balanceOf(address(this));
         asset.transfer(address(vault), balance);
-        vault.burnForStrategy(balance * 1e12); // assuming 6 to 18 decimals
         emit AssetWithdrawn(balance);
+    }
+
+    function _adjustEquilibria() internal {
+        MockERC20 ousd = MockERC20(address(vault.oUSD()));
+        uint256 balanceOUSD = ousd.balanceOf(address(this));
+        uint256 balanceUSDC = asset.balanceOf(address(this)) * 1e12; // assuming 6 to 18 decimals
+        if (balanceOUSD > balanceUSDC) {
+            uint256 diff = balanceOUSD - balanceUSDC;
+            vault.burnForStrategy(diff);
+        }
+        if (balanceUSDC > balanceOUSD) {
+            uint256 diff = balanceUSDC - balanceOUSD;
+            vault.mintForStrategy(diff);
+        }
+        assert(ousd.balanceOf(address(this)) == asset.balanceOf(address(this)) * 1e12);
     }
 }
