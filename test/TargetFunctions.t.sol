@@ -29,14 +29,14 @@ abstract contract TargetFunctions is Setup {
     // [ ] addWithdrawalQueueLiquidity
     //
     // --- Liquidity Management
-    // [ ] rebase
+    // [x] rebase
     // [x] allocate
     // [x] depositToStrategy
     // [x] withdrawAllFromStrategy
     // [x] withdrawAllFromStrategies
     // [x] withdrawFromStrategy
     // [x] simulateYieldOnStrategy
-    // [ ] simulateYieldOnVault
+    // [x] simulateYieldOnVault
     //
     // --- Setters
     // [x] setAutoAllocateThreshold
@@ -47,7 +47,11 @@ abstract contract TargetFunctions is Setup {
     // [x] setTrusteeFeeBps
     // [x] setVaultBuffer
     // [x] setWithdrawalClaimDelay
+    //
+    // --- Time Manipulation
+    // [x] timeJump
 
+    using Logger for uint24;
     using Logger for uint48;
     using Logger for uint64;
     using Logger for uint256;
@@ -109,6 +113,10 @@ abstract contract TargetFunctions is Setup {
         // Log rebase info
         if (!ENABLE_LOGS) return;
         uint256 supplyAfter = ousd.totalSupply();
+        uint256 pctChange = supplyAfter > supplyBefore
+            ? ((supplyAfter - supplyBefore) * 1e18) / supplyBefore
+            : ((supplyBefore - supplyAfter) * 1e18) / supplyBefore;
+        string memory sign = supplyAfter >= supplyBefore ? "+" : "-";
         console.log(
             string(
                 abi.encodePacked(
@@ -118,7 +126,12 @@ abstract contract TargetFunctions is Setup {
                     supplyBefore.decimals(18, true, true),
                     " OUSD (before) -> ",
                     supplyAfter.decimals(18, true, true),
-                    " OUSD (after)"
+                    " OUSD (after) +",
+                    (supplyAfter - supplyBefore).decimals(18, true, true),
+                    " OUSD (",
+                    sign,
+                    pctChange.decimals(18, true, true),
+                    " %)"
                 )
             )
         );
@@ -359,6 +372,44 @@ abstract contract TargetFunctions is Setup {
         );
     }
 
+    /// @notice Handler for simulateYieldOnVault function
+    /// @param amount The amount of yield to simulate
+    /// @dev amount is uint256 to allow large yield amounts
+    function handlerSimulateYieldOnVault(uint256 amount) public {
+        // Get vault balance (includes strategy balances)
+        uint256 balance = vault.checkBalance(address(usdc));
+
+        // Assume vault has at least 20 USDC balance
+        vm.assume(balance >= 20);
+
+        // Max reasonable yield is 5% of the current balance
+        uint256 maxYield = balance / 20;
+
+        // Bound amount to maxYield
+        amount = _bound(amount, 1, maxYield);
+
+        // Simulate yield on vault
+        usdc.mint(address(vault), amount);
+
+        // Log simulate yield info
+        if (!ENABLE_LOGS) return;
+        // Calculate yield percentage
+        uint256 yieldPct = (amount * 1e18) / balance;
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    "Fuzzer  ",
+                    " -> simulateYieldOnVault():        ",
+                    amount.decimals(6, true, true),
+                    " USDC (+",
+                    yieldPct.decimals(18, true, true),
+                    " %)"
+                )
+            )
+        );
+    }
+
     ////////////////////////////////////////////////////
     /// --- Setters Handlers
     ////////////////////////////////////////////////////
@@ -584,6 +635,38 @@ abstract contract TargetFunctions is Setup {
                     vm.getLabel(governor),
                     " -> setWithdrawalClaimDelay():     ",
                     uint256(withdrawalClaimDelay).formatTime()
+                )
+            )
+        );
+    }
+
+    ////////////////////////////////////////////////////
+    /// --- Time Manipulation Handlers
+    ////////////////////////////////////////////////////
+    /// @notice Handler for timeJump function
+    /// @param secondsToWarp The number of seconds to warp forward
+    function handlerTimeJump(uint24 secondsToWarp) public {
+        // Bound the parameter to a reasonable range (10 minute to 30 days)
+        uint256 timestampBefore = block.timestamp;
+        secondsToWarp = uint24(_bound(secondsToWarp, 10 minutes, 30 days));
+        // Time jump forward
+        vm.warp(block.timestamp + secondsToWarp);
+
+        // Log time jump info
+        if (!ENABLE_LOGS) return;
+        uint256 timestampAfter = block.timestamp;
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    "Fuzzer  ",
+                    " -> timeJump():                    ",
+                    timestampBefore.decimals(0, true, false),
+                    " -> ",
+                    timestampAfter.decimals(0, true, false),
+                    " (+",
+                    secondsToWarp.formatTime(),
+                    ")"
                 )
             )
         );
