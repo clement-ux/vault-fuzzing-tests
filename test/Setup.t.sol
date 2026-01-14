@@ -108,6 +108,8 @@ abstract contract Setup is Base {
 
         strategyAMO = new MockStrategyAMO(address(vault));
         strategyTrad = new MockStrategyTrad(address(vault));
+        strategies.push(address(strategyAMO));
+        strategies.push(address(strategyTrad));
     }
 
     //////////////////////////////////////////////////////

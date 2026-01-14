@@ -48,6 +48,8 @@ abstract contract Base is Test {
     address public treasury = makeAddr("Treasury");
     address[] public users;
 
+    address[] public strategies;
+
     ////////////////////////////////////////////////////
     /// --- CONTRACTS & MOCKS
     ////////////////////////////////////////////////////
