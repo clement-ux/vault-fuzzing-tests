@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.31;
 
+// Foundry
 import {Vm} from "@forge-std/Vm.sol";
 
 library Logger {
@@ -8,15 +9,16 @@ library Logger {
 
     function decimals(uint256 amount, uint256 decimal, bool withSeparator, bool trimZeros)
         public
-        view
+        pure
         returns (string memory)
     {
         uint256 integerPart = amount / (10 ** decimal);
         uint256 fractionalPart = amount % (10 ** decimal);
 
         string memory intStr = withSeparator ? addCommas(vm.toString(integerPart)) : vm.toString(integerPart);
-        string memory fracStr =
-            trimZeros ? removeTrailingZeros(vm.toString(fractionalPart)) : vm.toString(fractionalPart);
+        string memory fracStr = vm.toString(fractionalPart);
+        fracStr = padLeft(fracStr, decimal, "0");
+        fracStr = trimZeros ? removeTrailingZeros(fracStr) : fracStr;
 
         return bytes(fracStr).length > 0 ? string(abi.encodePacked(intStr, ".", fracStr)) : intStr;
     }
@@ -61,7 +63,29 @@ library Logger {
         return string(result);
     }
 
-    function formatTime(uint256 _seconds) public pure returns (string memory) {
+    function padLeft(string memory str, uint256 length, string memory padChar) internal pure returns (string memory) {
+        bytes memory strBytes = bytes(str);
+
+        if (strBytes.length >= length) {
+            return str;
+        }
+
+        uint256 padCount = length - strBytes.length;
+        bytes memory result = new bytes(length);
+        bytes memory padBytes = bytes(padChar);
+
+        for (uint256 i = 0; i < padCount; i++) {
+            result[i] = padBytes[0];
+        }
+
+        for (uint256 i = 0; i < strBytes.length; i++) {
+            result[padCount + i] = strBytes[i];
+        }
+
+        return string(result);
+    }
+
+    function formatTime(uint256 _seconds) public view returns (string memory) {
         uint256 _years = _seconds / 365 days;
         uint256 _days = (_seconds % 365 days) / 1 days;
         uint256 _hours = (_seconds % 1 days) / 1 hours;
