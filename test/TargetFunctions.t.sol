@@ -313,7 +313,7 @@ abstract contract TargetFunctions is Setup {
     /// @param random A random value for fuzzing random strategy
     /// @param amount The amount of yield to simulate
     /// @dev amount is uint256 to allow large yield amounts
-    function handlerSimuateYieldOnStrategy(uint8 random, uint256 amount) public {
+    function handlerSimulateYieldOnStrategy(uint8 random, uint256 amount) public {
         // Select random strategy that has at least 20 USDC balance, otherwise skip
         // 20 USDC is chosen to ensure we can simulate at least 0.05% yield
         address strategy;

@@ -41,7 +41,7 @@ contract FuzzerFoundry is Properties {
 
         //
         selectors[9] = this.handlerAllocate.selector;
-        selectors[10] = this.handlerSimuateYieldOnStrategy.selector;
+        selectors[10] = this.handlerSimulateYieldOnStrategy.selector;
         selectors[11] = this.handlerDepositToStrategy.selector;
         selectors[12] = this.handlerWithdrawFromStrategy.selector;
         selectors[13] = this.handlerWithdrawAllFromStrategy.selector;
