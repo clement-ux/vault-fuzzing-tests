@@ -25,7 +25,7 @@ contract FuzzerFoundry is Properties {
 
         // Add selectors
 
-        bytes4[] memory selectors = new bytes4[](12);
+        bytes4[] memory selectors = new bytes4[](16);
         // Setter handlers
         selectors[0] = this.handlerSetAutoAllocateThreshold.selector;
         selectors[1] = this.handlerSetDripDuration.selector;
@@ -43,6 +43,10 @@ contract FuzzerFoundry is Properties {
         selectors[9] = this.handlerAllocate.selector;
         selectors[10] = this.handlerSimuateYieldOnStrategy.selector;
         selectors[11] = this.handlerDepositToStrategy.selector;
+        selectors[12] = this.handlerWithdrawFromStrategy.selector;
+        selectors[13] = this.handlerWithdrawAllFromStrategy.selector;
+        selectors[14] = this.handlerWithdrawAllFromStrategies.selector;
+        selectors[15] = this.handlerRebase.selector;
 
         // Target selectors
         targetSelector(FuzzSelector({addr: address(this), selectors: selectors}));

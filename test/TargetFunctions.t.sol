@@ -32,10 +32,11 @@ abstract contract TargetFunctions is Setup {
     // [ ] rebase
     // [x] allocate
     // [x] depositToStrategy
-    // [ ] withdrawAllFromStrategy
-    // [ ] withdrawAllFromStrategies
-    // [ ] withdrawFromStrategy
+    // [x] withdrawAllFromStrategy
+    // [x] withdrawAllFromStrategies
+    // [x] withdrawFromStrategy
     // [x] simulateYieldOnStrategy
+    // [ ] simulateYieldOnVault
     //
     // --- Setters
     // [x] setAutoAllocateThreshold
@@ -100,6 +101,29 @@ abstract contract TargetFunctions is Setup {
     ////////////////////////////////////////////////////
     /// --- Liquidity Management Handlers
     ////////////////////////////////////////////////////
+    /// @notice Handler for rebase function
+    function handlerRebase() public {
+        uint256 supplyBefore = ousd.totalSupply();
+        vault.rebase();
+
+        // Log rebase info
+        if (!ENABLE_LOGS) return;
+        uint256 supplyAfter = ousd.totalSupply();
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    "Fuzzer  ",
+                    " -> rebase():                      ",
+                    supplyBefore.decimals(18, true, true),
+                    " OUSD (before) -> ",
+                    supplyAfter.decimals(18, true, true),
+                    " OUSD (after)"
+                )
+            )
+        );
+    }
+
     /// @notice Handler for allocate function
     function handlerAllocate() public {
         // Cache strategy balance before
@@ -168,6 +192,118 @@ abstract contract TargetFunctions is Setup {
                     amount.decimals(6, true, true),
                     " USDC to: ",
                     vm.getLabel(strategy)
+                )
+            )
+        );
+    }
+
+    /// @notice Handler for withdrawFromStrategy function
+    /// @param random A random value for fuzzing random strategy
+    /// @param amount The amount to withdraw
+    /// @dev amount is uint256 to allow large withdraw amounts
+    function handlerWithdrawFromStrategy(uint8 random, uint256 amount) public {
+        address strategy;
+        uint256 strategyBalance;
+        uint256 len = strategies.length;
+        // Select random strategy that has at least 1 USDC balance, otherwise skip
+        for (uint256 i = random; i < random + len; i++) {
+            if (usdc.balanceOf(strategies[i % len]) >= 1) {
+                strategyBalance = usdc.balanceOf(strategies[i % len]);
+                strategy = strategies[i % len];
+                break;
+            }
+        }
+
+        // Assume we find a valid strategy
+        vm.assume(strategy != address(0));
+
+        // Bound amount to strategy balance
+        amount = _bound(amount, 1, strategyBalance);
+
+        address[] memory assets = new address[](1);
+        assets[0] = address(usdc);
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+        // Prank as operator and call withdrawFromStrategy
+        vm.prank(operator);
+        vault.withdrawFromStrategy(strategy, assets, amounts);
+
+        // Log withdrawFromStrategy info
+        if (!ENABLE_LOGS) return;
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    vm.getLabel(operator),
+                    " -> withdrawFromStrategy():        ",
+                    amount.decimals(6, true, true),
+                    " USDC from: ",
+                    vm.getLabel(strategy)
+                )
+            )
+        );
+    }
+
+    /// @notice Handler for withdrawAllFromStrategy function
+    /// @param random A random value for fuzzing random strategy
+    function handlerWithdrawAllFromStrategy(uint8 random) public {
+        address strategy;
+        uint256 strategyBalance;
+        uint256 len = strategies.length;
+        // Select random strategy that has at least 1 USDC balance, otherwise skip
+        for (uint256 i = random; i < random + len; i++) {
+            if (usdc.balanceOf(strategies[i % len]) >= 1) {
+                strategyBalance = usdc.balanceOf(strategies[i % len]);
+                strategy = strategies[i % len];
+                break;
+            }
+        }
+
+        // Assume we find a valid strategy
+        vm.assume(strategy != address(0));
+
+        uint256 balanceBefore = usdc.balanceOf(address(strategy));
+        // Prank as operator and call withdrawAllFromStrategy
+        vm.prank(operator);
+        vault.withdrawAllFromStrategy(strategy);
+
+        // Log withdrawAllFromStrategy info
+        if (!ENABLE_LOGS) return;
+        uint256 balanceAfter = usdc.balanceOf(address(strategy));
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    vm.getLabel(operator),
+                    " -> withdrawAllFromStrategy():     ",
+                    (balanceBefore - balanceAfter).decimals(6, true, true),
+                    " USDC from: ",
+                    vm.getLabel(strategy)
+                )
+            )
+        );
+    }
+
+    /// @notice Handler for withdrawAllFromStrategies function
+    function handlerWithdrawAllFromStrategies() public {
+        // Note: To avoid withdrawing from empty strategies, perhaps we can
+        // check that at least one strategy has balance before calling this function.
+        uint256 balanceBefore = usdc.balanceOf(address(vault));
+        // Prank as operator and call withdrawAllFromStrategies
+        vm.prank(operator);
+        vault.withdrawAllFromStrategies();
+
+        // Log withdrawAllFromStrategies info
+        if (!ENABLE_LOGS) return;
+        uint256 balanceAfter = usdc.balanceOf(address(vault));
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    vm.getLabel(operator),
+                    " -> withdrawAllFromStrategies():   ",
+                    (balanceAfter - balanceBefore).decimals(6, true, true),
+                    " USDC"
                 )
             )
         );
