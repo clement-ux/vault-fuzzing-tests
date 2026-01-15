@@ -17,3 +17,6 @@ docs/
 
 # Soldeer
 /dependencies
+
+# Coverage reports
+lcov.info
