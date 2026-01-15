@@ -307,6 +307,15 @@ abstract contract TargetFunctions is Setup {
         );
     }
 
+    /// @notice Handler for addWithdrawalQueueLiquidity function
+    function handlerAddWithdrawalQueueLiquidity() public {
+        vault.addWithdrawalQueueLiquidity();
+
+        // Log addWithdrawalQueueLiquidity info
+        if (!ENABLE_LOGS) return;
+        console.log(string(abi.encodePacked("> ", "Fuzzer  ", " -> addWithdrawalQueueLiquidity(): ", "Called")));
+    }
+
     ////////////////////////////////////////////////////
     /// --- Liquidity Management Handlers
     ////////////////////////////////////////////////////

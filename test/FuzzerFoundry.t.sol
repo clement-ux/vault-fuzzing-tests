@@ -25,7 +25,7 @@ contract FuzzerFoundry is Properties {
 
         // Add selectors
 
-        bytes4[] memory selectors = new bytes4[](21);
+        bytes4[] memory selectors = new bytes4[](22);
         // Setter handlers
         selectors[0] = this.handlerSetAutoAllocateThreshold.selector;
         selectors[1] = this.handlerSetDripDuration.selector;
@@ -41,19 +41,20 @@ contract FuzzerFoundry is Properties {
         selectors[9] = this.handlerRequestWithdrawal.selector;
         selectors[10] = this.handlerClaimWithdrawal.selector;
         selectors[11] = this.handlerClaimWithdrawals.selector;
+        selectors[12] = this.handlerAddWithdrawalQueueLiquidity.selector;
 
         // Strategy interaction handlers
-        selectors[12] = this.handlerAllocate.selector;
-        selectors[13] = this.handlerRebase.selector;
-        selectors[14] = this.handlerDepositToStrategy.selector;
-        selectors[15] = this.handlerWithdrawFromStrategy.selector;
-        selectors[16] = this.handlerWithdrawAllFromStrategy.selector;
-        selectors[17] = this.handlerWithdrawAllFromStrategies.selector;
-        selectors[18] = this.handlerSimulateYieldOnVault.selector;
-        selectors[19] = this.handlerSimulateYieldOnStrategy.selector;
+        selectors[13] = this.handlerAllocate.selector;
+        selectors[14] = this.handlerRebase.selector;
+        selectors[15] = this.handlerDepositToStrategy.selector;
+        selectors[16] = this.handlerWithdrawFromStrategy.selector;
+        selectors[17] = this.handlerWithdrawAllFromStrategy.selector;
+        selectors[18] = this.handlerWithdrawAllFromStrategies.selector;
+        selectors[19] = this.handlerSimulateYieldOnVault.selector;
+        selectors[20] = this.handlerSimulateYieldOnStrategy.selector;
 
         // Time manipulation handler
-        selectors[20] = this.handlerTimeJump.selector;
+        selectors[21] = this.handlerTimeJump.selector;
 
         // Target selectors
         targetSelector(FuzzSelector({addr: address(this), selectors: selectors}));
