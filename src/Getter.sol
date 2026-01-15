@@ -27,4 +27,21 @@ library Getter {
 
         return assetBalance - outstandingWithdrawals;
     }
+
+    /// @notice Gets the last withdrawal request index from the vault
+    /// @param vault The vault to check
+    /// @return The last withdrawal request index
+    function getLastWithdrawalIndex(OUSDVault vault) internal view returns (uint256) {
+        (,,, uint128 lastIndex) = vault.withdrawalQueueMetadata();
+        return lastIndex - 1;
+    }
+
+    /// @notice Gets the timestamp of a withdrawal request
+    /// @param vault The vault to check
+    /// @param requestId The id of the withdrawal request
+    /// @return The timestamp of the withdrawal request
+    function getRequestTimestamp(OUSDVault vault, uint256 requestId) internal view returns (uint256) {
+        (,, uint40 requestTimestamp,,) = vault.withdrawalRequests(requestId);
+        return requestTimestamp;
+    }
 }

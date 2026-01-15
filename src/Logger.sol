@@ -85,7 +85,7 @@ library Logger {
         return string(result);
     }
 
-    function formatTime(uint256 _seconds) public view returns (string memory) {
+    function formatTime(uint256 _seconds) public pure returns (string memory) {
         uint256 _years = _seconds / 365 days;
         uint256 _days = (_seconds % 365 days) / 1 days;
         uint256 _hours = (_seconds % 1 days) / 1 hours;
@@ -108,5 +108,20 @@ library Logger {
                 " seconds)"
             )
         );
+    }
+
+    function uintArrayToString(uint256[] memory arr) internal pure returns (string memory) {
+        if (arr.length == 0) return "[]";
+
+        string memory result = "[";
+        for (uint256 i = 0; i < arr.length; i++) {
+            result = string(abi.encodePacked(result, vm.toString(arr[i])));
+            if (i < arr.length - 1) {
+                result = string(abi.encodePacked(result, ", "));
+            }
+        }
+        result = string(abi.encodePacked(result, "]"));
+
+        return result;
     }
 }

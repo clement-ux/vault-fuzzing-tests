@@ -60,4 +60,13 @@ abstract contract Base is Test {
     VaultProxy internal vaultProxy;
     MockStrategyAMO internal strategyAMO;
     MockStrategyTrad internal strategyTrad;
+
+    ////////////////////////////////////////////////////
+    /// --- INVARIANT RELATED STATE VARIABLES
+    ////////////////////////////////////////////////////
+    mapping(address user => uint256[] withdrawalRequestIds) internal userToWithdrawalRequestIds;
+
+    function getWithdrawalRequestIds(address user) internal view returns (uint256[] memory) {
+        return userToWithdrawalRequestIds[user];
+    }
 }
