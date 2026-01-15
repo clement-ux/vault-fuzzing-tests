@@ -25,7 +25,7 @@ contract FuzzerFoundry is Properties {
 
         // Add selectors
 
-        bytes4[] memory selectors = new bytes4[](18);
+        bytes4[] memory selectors = new bytes4[](21);
         // Setter handlers
         selectors[0] = this.handlerSetAutoAllocateThreshold.selector;
         selectors[1] = this.handlerSetDripDuration.selector;
@@ -38,19 +38,22 @@ contract FuzzerFoundry is Properties {
 
         // Mint & Redeem handlers
         selectors[8] = this.handlerMint.selector;
+        selectors[9] = this.handlerRequestWithdrawal.selector;
+        selectors[10] = this.handlerClaimWithdrawal.selector;
+        selectors[11] = this.handlerClaimWithdrawals.selector;
 
         // Strategy interaction handlers
-        selectors[9] = this.handlerAllocate.selector;
-        selectors[10] = this.handlerRebase.selector;
-        selectors[11] = this.handlerDepositToStrategy.selector;
-        selectors[12] = this.handlerWithdrawFromStrategy.selector;
-        selectors[13] = this.handlerWithdrawAllFromStrategy.selector;
-        selectors[14] = this.handlerWithdrawAllFromStrategies.selector;
-        selectors[15] = this.handlerSimulateYieldOnVault.selector;
-        selectors[16] = this.handlerSimulateYieldOnStrategy.selector;
+        selectors[12] = this.handlerAllocate.selector;
+        selectors[13] = this.handlerRebase.selector;
+        selectors[14] = this.handlerDepositToStrategy.selector;
+        selectors[15] = this.handlerWithdrawFromStrategy.selector;
+        selectors[16] = this.handlerWithdrawAllFromStrategy.selector;
+        selectors[17] = this.handlerWithdrawAllFromStrategies.selector;
+        selectors[18] = this.handlerSimulateYieldOnVault.selector;
+        selectors[19] = this.handlerSimulateYieldOnStrategy.selector;
 
         // Time manipulation handler
-        selectors[17] = this.handlerTimeJump.selector;
+        selectors[20] = this.handlerTimeJump.selector;
 
         // Target selectors
         targetSelector(FuzzSelector({addr: address(this), selectors: selectors}));

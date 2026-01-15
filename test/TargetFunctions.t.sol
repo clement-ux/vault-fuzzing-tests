@@ -54,7 +54,9 @@ abstract contract TargetFunctions is Setup {
     using Logger for uint24;
     using Logger for uint48;
     using Logger for uint64;
+    using Logger for uint96;
     using Logger for uint256;
+    using Logger for uint256[];
     using Getter for OUSDVault;
 
     ////////////////////////////////////////////////////
@@ -94,9 +96,212 @@ abstract contract TargetFunctions is Setup {
                     "   ",
                     " -> mint():                        ",
                     ousdMinted.decimals(18, true, true),
-                    " OUSD with ",
-                    amount.decimals(6, true, true),
-                    " USDC"
+                    " OUSD"
+                )
+            )
+        );
+    }
+
+    /// @notice Handler for requestWithdrawal function
+    /// @param amount The amount to request withdrawal
+    /// @param random A random value for fuzzing random user
+    /// @dev amount is uint56 because it can represent up to ~79b with 18 decimals (OUSD)
+    function handlerRequestWithdrawal(uint96 amount, uint8 random) public {
+        // Ensure async withdrawals are enabled
+        vm.assume(vault.withdrawalClaimDelay() > 0);
+
+        address user;
+        uint256 userOusdBalance;
+        uint256 len = users.length;
+        // Select random user that has at least 1 wei of OUSD balance, otherwise skip
+        for (uint256 i = random; i < random + len; i++) {
+            userOusdBalance = ousd.balanceOf(users[i % len]);
+            if (userOusdBalance >= 1) {
+                user = users[i % len];
+                break;
+            }
+        }
+
+        // Assume we find a valid user
+        vm.assume(user != address(0));
+        // Bound amount to user's OUSD balance
+        amount = uint96(_bound(amount, 1, userOusdBalance));
+
+        // Prank as user and request withdrawal
+        vm.prank(user);
+        try vault.requestWithdrawal(amount) {}
+        catch Error(string memory reason) {
+            vm.assume(
+                keccak256(abi.encodePacked(reason)) != keccak256(abi.encodePacked("Backing supply liquidity error"))
+            );
+            revert(reason);
+        }
+        uint256 index = vault.getLastWithdrawalIndex();
+        userToWithdrawalRequestIds[user].push(index);
+
+        // Log request withdrawal info
+        if (!ENABLE_LOGS) return;
+        // Get index of the last withdrawal request
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    vm.getLabel(user),
+                    "   ",
+                    " -> requestWithdrawal():           ",
+                    amount.decimals(18, true, true),
+                    " OUSD (index: ",
+                    index.decimals(0, true, false),
+                    ")"
+                )
+            )
+        );
+    }
+
+    /// @notice Handler for claimWithdrawal function
+    /// @param random A random value for fuzzing random user
+    /// @param randomRequest A random value for fuzzing random request index
+    function handlerClaimWithdrawal(uint8 random, uint16 randomRequest) public {
+        // Ensure async withdrawals are enabled
+        uint256 claimDelay = vault.withdrawalClaimDelay();
+        vm.assume(claimDelay > 0);
+        address user;
+        uint256 request;
+        uint256 len = users.length;
+        // Select random user that has at least 1 pending withdrawal request, otherwise skip
+        for (uint256 i = random; i < random + len; i++) {
+            uint256 pendingRequests = userToWithdrawalRequestIds[users[i % len]].length;
+            if (pendingRequests > 0) {
+                user = users[i % len];
+                request = userToWithdrawalRequestIds[user][randomRequest % pendingRequests];
+                break;
+            }
+        }
+
+        // Assume we find a valid user
+        vm.assume(user != address(0));
+
+        // Timejump to after maturity only if needed
+        uint256 requestTimestamp = vault.getRequestTimestamp(request);
+        if (block.timestamp < (requestTimestamp + claimDelay)) vm.warp(requestTimestamp + claimDelay);
+
+        uint256 balanceBefore = usdc.balanceOf(user);
+        // Prank as user and claim withdrawal
+        vm.prank(user);
+        try vault.claimWithdrawal(request) {}
+        catch Error(string memory reason) {
+            vm.assume(
+                keccak256(abi.encodePacked(reason)) != keccak256(abi.encodePacked("Backing supply liquidity error"))
+            );
+            vm.assume(keccak256(abi.encodePacked(reason)) != keccak256(abi.encodePacked("Queue pending liquidity")));
+            revert(reason);
+        }
+
+        // Remove the request from the user's pending requests
+        uint256[] storage requests = userToWithdrawalRequestIds[user];
+        for (uint256 i = 0; i < requests.length; i++) {
+            if (requests[i] == request) {
+                requests[i] = requests[requests.length - 1];
+                requests.pop();
+                break;
+            }
+        }
+
+        // Log claim withdrawal info
+        if (!ENABLE_LOGS) return;
+        uint256 balanceAfter = usdc.balanceOf(user);
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    vm.getLabel(user),
+                    "   ",
+                    " -> claimWithdrawal():             ",
+                    (balanceAfter - balanceBefore).decimals(6, true, true),
+                    " USDC (from request index: ",
+                    request.decimals(0, true, false),
+                    ")"
+                )
+            )
+        );
+    }
+
+    /// @notice Handler for claimWithdrawals function
+    /// @param random A random value for fuzzing random user
+    /// @param randomRequestCount A random value for fuzzing random number of requests to claim
+    function handlerClaimWithdrawals(uint8 random, uint16 randomRequestCount) public {
+        // Ensure async withdrawals are enabled
+        uint256 claimDelay = vault.withdrawalClaimDelay();
+        vm.assume(claimDelay > 0);
+
+        // Select random user that has at least 1 pending withdrawal request, otherwise skip
+        address user;
+        uint256[] memory requests;
+        uint256 len = users.length;
+        for (uint256 i = random; i < random + len; i++) {
+            uint256 pendingRequests = userToWithdrawalRequestIds[users[i % len]].length;
+            if (pendingRequests > 0) {
+                user = users[i % len];
+                requests = userToWithdrawalRequestIds[user];
+                break;
+            }
+        }
+
+        // Assume we find a valid user
+        vm.assume(user != address(0));
+
+        // Build a random list of requests to claim
+        uint256 latestRequestTimestamp;
+        uint256 claimCount = _bound(randomRequestCount, 1, requests.length);
+        uint256[] memory shuffledRequests = vm.shuffle(requests);
+        uint256[] memory requestsToClaim = new uint256[](claimCount);
+        for (uint256 i = 0; i < claimCount; i++) {
+            requestsToClaim[i] = shuffledRequests[i];
+            uint256 requestTimestamp = vault.getRequestTimestamp(shuffledRequests[i]);
+            if (requestTimestamp > latestRequestTimestamp) latestRequestTimestamp = requestTimestamp;
+        }
+
+        // Timejump to after maturity only if needed
+        if (block.timestamp < (latestRequestTimestamp + claimDelay)) vm.warp(latestRequestTimestamp + claimDelay);
+
+        uint256 balanceBefore = usdc.balanceOf(user);
+        // Prank as user and claim withdrawals
+        vm.prank(user);
+        try vault.claimWithdrawals(requestsToClaim) {}
+        catch Error(string memory reason) {
+            vm.assume(
+                keccak256(abi.encodePacked(reason)) != keccak256(abi.encodePacked("Backing supply liquidity error"))
+            );
+            vm.assume(keccak256(abi.encodePacked(reason)) != keccak256(abi.encodePacked("Queue pending liquidity")));
+            revert(reason);
+        }
+
+        // Remove the requests from the user's pending requests
+        uint256[] storage userRequests = userToWithdrawalRequestIds[user];
+        for (uint256 i; i < requestsToClaim.length; i++) {
+            for (uint256 j; j < userRequests.length; j++) {
+                if (userRequests[j] == requestsToClaim[i]) {
+                    userRequests[j] = userRequests[userRequests.length - 1];
+                    userRequests.pop();
+                    break;
+                }
+            }
+        }
+
+        // Log claim withdrawals info
+        if (!ENABLE_LOGS) return;
+        uint256 balanceAfter = usdc.balanceOf(user);
+        console.log(
+            string(
+                abi.encodePacked(
+                    "> ",
+                    vm.getLabel(user),
+                    "   ",
+                    " -> claimWithdrawals():            ",
+                    (balanceAfter - balanceBefore).decimals(6, true, true),
+                    " USDC (from ",
+                    requestsToClaim.uintArrayToString(),
+                    " requests)"
                 )
             )
         );
@@ -472,10 +677,10 @@ abstract contract TargetFunctions is Setup {
     /// @param maxSupplyDiffPct The max supply diff percentage.
     /// @dev This function can only be called by governor, thus parameters range can be less randomized.
     ///      In the current setup, 5% is used.
-    ///      For the test, the range will be 2 -> 10%
+    ///      For the test, the range will be 5 -> 15%
     function handlerSetMaxSupplyDiff(uint8 maxSupplyDiffPct) public {
         // Bound the parameter to valid range
-        maxSupplyDiffPct = uint8(_bound(maxSupplyDiffPct, 2, 10));
+        maxSupplyDiffPct = uint8(_bound(maxSupplyDiffPct, 5, 15));
 
         // Prank as governor and set max supply diff
         vm.prank(governor);
