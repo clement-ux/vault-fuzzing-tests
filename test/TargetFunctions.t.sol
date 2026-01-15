@@ -23,9 +23,9 @@ abstract contract TargetFunctions is Setup {
     // ╚══════════════════════════════════════════════════════════════════════════════╝
     // --- Mint & Redeem
     // [x] mint
-    // [ ] requestWithdrawal
-    // [ ] claimWithdrawals
-    // [ ] claimWithdrawal
+    // [x] requestWithdrawal
+    // [x] claimWithdrawals
+    // [x] claimWithdrawal
     // [ ] addWithdrawalQueueLiquidity
     //
     // --- Liquidity Management
@@ -569,7 +569,7 @@ abstract contract TargetFunctions is Setup {
                     " -> simulateYieldOnStrategy():     ",
                     amount.decimals(6, true, true),
                     " USDC (+",
-                    yieldPct.decimals(18, true, true),
+                    yieldPct.decimals(16, true, true),
                     " %) for: ",
                     vm.getLabel(strategy)
                 )
@@ -608,7 +608,7 @@ abstract contract TargetFunctions is Setup {
                     " -> simulateYieldOnVault():        ",
                     amount.decimals(6, true, true),
                     " USDC (+",
-                    yieldPct.decimals(18, true, true),
+                    yieldPct.decimals(16, true, true),
                     " %)"
                 )
             )
@@ -875,5 +875,108 @@ abstract contract TargetFunctions is Setup {
                 )
             )
         );
+    }
+
+    ////////////////////////////////////////////////////
+    /// --- After Invariant
+    ////////////////////////////////////////////////////
+    function afterInvariant() public {
+        if (ENABLE_LOGS) {
+            console.log("");
+            console.log("=== After Invariant ===");
+        }
+
+        // 1. Withdraw all from all strategies to ensure all assets are in the vault
+        if (ENABLE_LOGS) {
+            console.log("> Withdrawing all from all strategies...");
+        }
+        vm.prank(operator);
+        vault.withdrawAllFromStrategies();
+
+        // 2. Set Rebase Rate Max to high value to ensure all yield is rebased
+        if (ENABLE_LOGS) {
+            console.log("> Setting rebase rate max to high value...");
+        }
+        vm.prank(operator);
+        vault.setRebaseRateMax(18.25 ether); // 18.25 ether
+
+        // 3. Set drip duration to 1 day to ensure all fees are dripped quickly
+        if (ENABLE_LOGS) {
+            console.log("> Setting drip duration to 1 day...");
+        }
+        vm.prank(operator);
+        vault.setDripDuration(1 days);
+        vault.rebase();
+
+        // 4. Timejump 100 days to ensure all fees are dripped
+        if (ENABLE_LOGS) {
+            console.log("> Timejumping 100 days to drip all fees...");
+        }
+        for (uint256 i; i < 10; i++) {
+            skip(1 days);
+            vault.rebase();
+        }
+
+        // 5. Ensure async withdrawals are enabled
+        if (ENABLE_LOGS) {
+            console.log("> Enabling async withdrawals with 1 day delay...");
+        }
+        vm.prank(governor);
+        vault.setWithdrawalClaimDelay(1 days);
+
+        // 6. Set max supply diff to 100% to avoid rebase issues during withdrawals
+        if (ENABLE_LOGS) {
+            console.log("> Setting max supply diff to 100%...");
+        }
+        vm.prank(governor);
+        vault.setMaxSupplyDiff(1e18); // 100%
+
+        // 7. Each user requests to withdraw their full OUSD balance
+        if (ENABLE_LOGS) {
+            console.log("> Users requesting withdrawals of their full OUSD balance...");
+        }
+        uint256 len = users.length;
+        for (uint256 i = 0; i < len; i++) {
+            address user = users[i];
+            uint256 ousdBalance = ousd.balanceOf(user);
+            if (ousdBalance > 0) {
+                if (ENABLE_LOGS) {
+                    console.log(
+                        string(
+                            abi.encodePacked(
+                                "> ",
+                                vm.getLabel(user),
+                                "   ",
+                                " -> requestWithdrawal():           ",
+                                ousdBalance.decimals(18, true, true),
+                                " OUSD"
+                            )
+                        )
+                    );
+                }
+                vm.prank(user);
+                vault.requestWithdrawal(ousdBalance);
+                userToWithdrawalRequestIds[user].push(vault.getLastWithdrawalIndex());
+            }
+        }
+
+        // 8. Timejump to after all withdrawal maturities
+        if (ENABLE_LOGS) {
+            console.log("> Timejumping 2 days to pass withdrawal claim delay...");
+        }
+        skip(2 days);
+
+        // 9. Each user claims all their pending withdrawals
+        if (ENABLE_LOGS) {
+            console.log("> Users claiming all their pending withdrawals...");
+        }
+        for (uint256 i = 0; i < len; i++) {
+            address user = users[i];
+            uint256[] memory requests = userToWithdrawalRequestIds[user];
+            if (requests.length > 0) {
+                vm.prank(user);
+                vault.claimWithdrawals(requests);
+            }
+        }
     }
 }
