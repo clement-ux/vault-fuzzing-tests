@@ -44,6 +44,7 @@ contract MockStrategyAMO {
     function withdraw(address, address, uint256 amount) public onlyVault {
         _adjustEquilibria();
         asset.transfer(address(vault), amount);
+        vault.burnForStrategy(amount * 1e12); // assuming 6 to 18 decimals
         emit AssetWithdrawn(amount);
     }
 
@@ -51,6 +52,7 @@ contract MockStrategyAMO {
         _adjustEquilibria();
         uint256 balance = asset.balanceOf(address(this));
         asset.transfer(address(vault), balance);
+        vault.burnForStrategy(balance * 1e12); // assuming 6 to 18 decimals
         emit AssetWithdrawn(balance);
     }
 
