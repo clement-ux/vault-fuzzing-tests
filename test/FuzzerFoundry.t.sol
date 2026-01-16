@@ -61,5 +61,10 @@ contract FuzzerFoundry is Properties {
         targetSender(makeAddr("FuzzerSender"));
     }
 
-    function invariantA() public view {}
+    function invariantA() public view {
+        assertTrue(propertyTotalSupplyLessThanOrEqualToVaultValue());
+        assertTrue(propertyClaimedLessThanOrEqualToClaimableAndLessThanOrEqualToQueued());
+        assertTrue(propertyWithdrawalRequestsQueuedLessThanOrEqualToMetadataQueued());
+        assertTrue(propertyTotalSharesEqualsUserSharesPlusDeadShares());
+    }
 }
