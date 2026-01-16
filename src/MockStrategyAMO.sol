@@ -25,7 +25,7 @@ contract MockStrategyAMO {
     }
 
     function checkBalance(address) public view returns (uint256 balance) {
-        return asset.balanceOf(address(this));
+        return asset.balanceOf(address(this)) + MockERC20(address(vault.oUSD())).balanceOf(address(this)) / 1e12; // assuming 6 to 18 decimals
     }
 
     function supportsAsset(address _asset) public view returns (bool) {
