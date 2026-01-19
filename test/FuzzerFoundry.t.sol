@@ -12,20 +12,27 @@ import {Properties} from "test/Properties.t.sol";
 ///         - Implements invariant test functions that call property validators
 ///         - Each invariant function represents a critical system property to maintain
 ///         - Fuzzer will call targeted handlers randomly and check invariants after each call
+///
+///         Invariants are split into separate functions for Foundry parallelization:
+///         - invariant_core_*           : Core system invariants
+///         - invariant_withdrawalQueue_*: Withdrawal queue invariants
+///         - invariant_rebase_*         : Rebase mechanism invariants
+///         - invariant_config_*         : Configuration bounds invariants
+///         - invariant_solvency_*       : Solvency and accounting invariants
 contract FuzzerFoundry is Properties {
-    //////////////////////////////////////////////////////
-    /// --- SETUP
-    //////////////////////////////////////////////////////
+    // ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+    // ║                                        SETUP                                             ║
+    // ╚══════════════════════════════════════════════════════════════════════════════════════════╝
+
     function setUp() public virtual override {
         super.setUp();
 
         // --- Setup Fuzzer target ---
-        // Setup target
         targetContract(address(this));
 
         // Add selectors
-
         bytes4[] memory selectors = new bytes4[](22);
+
         // Setter handlers
         selectors[0] = this.handlerSetAutoAllocateThreshold.selector;
         selectors[1] = this.handlerSetDripDuration.selector;
@@ -61,10 +68,93 @@ contract FuzzerFoundry is Properties {
         targetSender(makeAddr("FuzzerSender"));
     }
 
-    function invariantA() public view {
+    // ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+    // ║                                  CORE INVARIANTS                                         ║
+    // ╚══════════════════════════════════════════════════════════════════════════════════════════╝
+
+    /// @notice OUSD total supply should never exceed vault's total value
+    function invariant_core_totalSupplyLteVaultValue() public view {
         assertTrue(propertyTotalSupplyLessThanOrEqualToVaultValue());
-        assertTrue(propertyClaimedLessThanOrEqualToClaimableAndLessThanOrEqualToQueued());
-        assertTrue(propertyWithdrawalRequestsQueuedLessThanOrEqualToMetadataQueued());
+    }
+
+    /// @notice All OUSD should be accounted for across known addresses
+    function invariant_core_totalSharesAccountedFor() public view {
         assertTrue(propertyTotalSharesEqualsUserSharesPlusDeadShares());
+    }
+
+    // ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+    // ║                            WITHDRAWAL QUEUE INVARIANTS                                   ║
+    // ╚══════════════════════════════════════════════════════════════════════════════════════════╝
+
+    /// @notice Withdrawal queue metadata ordering: claimed <= claimable <= queued
+    function invariant_withdrawalQueue_metadataOrdering() public view {
+        assertTrue(propertyClaimedLessThanOrEqualToClaimableAndLessThanOrEqualToQueued());
+    }
+
+    /// @notice Individual request queued amounts should not exceed total queued
+    function invariant_withdrawalQueue_requestQueuedBounds() public view {
+        assertTrue(propertyWithdrawalRequestsQueuedLessThanOrEqualToMetadataQueued());
+    }
+
+    /// @notice All withdrawal request indices should have valid withdrawers
+    function invariant_withdrawalQueue_indexConsistency() public view {
+        assertTrue(propertyNextWithdrawalIndexConsistent());
+    }
+
+    /// @notice Withdrawal requests should be monotonically increasing
+    function invariant_withdrawalQueue_monotonicallyIncreasing() public view {
+        assertTrue(propertyWithdrawalRequestsQueuedMonotonicallyIncreasing());
+    }
+
+    /// @notice Vault should have enough assets for claimable withdrawals
+    function invariant_withdrawalQueue_sufficientLiquidity() public view {
+        assertTrue(propertyVaultHasEnoughAssetForClaimableWithdrawals());
+    }
+
+    // ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+    // ║                                 REBASE INVARIANTS                                        ║
+    // ╚══════════════════════════════════════════════════════════════════════════════════════════╝
+
+    /// @notice lastRebase timestamp should never be in the future
+    function invariant_rebase_timestampNotInFuture() public view {
+        assertTrue(propertyLastRebaseNotInFuture());
+    }
+
+    // ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+    // ║                           CONFIGURATION BOUNDS INVARIANTS                                ║
+    // ╚══════════════════════════════════════════════════════════════════════════════════════════╝
+
+    /// @notice Vault buffer should never exceed 100%
+    function invariant_config_vaultBufferBounds() public view {
+        assertTrue(propertyVaultBufferNotExceed100Percent());
+    }
+
+    /// @notice Max supply diff should be within reasonable bounds
+    function invariant_config_maxSupplyDiffBounds() public view {
+        assertTrue(propertyMaxSupplyDiffReasonable());
+    }
+
+    /// @notice Trustee fee should never exceed 50%
+    function invariant_config_trusteeFeeBounds() public view {
+        assertTrue(propertyTrusteeFeeBpsNotExceed50Percent());
+    }
+
+    // ╔══════════════════════════════════════════════════════════════════════════════════════════╗
+    // ║                                SOLVENCY INVARIANTS                                       ║
+    // ╚══════════════════════════════════════════════════════════════════════════════════════════╝
+
+    /// @notice Vault should always be solvent (assets >= liabilities)
+    function invariant_solvency_vaultIsSolvent() public view {
+        assertTrue(propertyVaultIsSolvent());
+    }
+
+    /// @notice Total value should be correctly calculated from underlying balances
+    function invariant_solvency_totalValueConsistency() public view {
+        assertTrue(propertyTotalValueConsistency());
+    }
+
+    /// @notice Decimal scaling between USDC and OUSD should be correct
+    function invariant_solvency_decimalScaling() public view {
+        assertTrue(propertyCorrectDecimalScaling());
     }
 }

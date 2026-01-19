@@ -106,7 +106,7 @@ abstract contract Setup is Base {
 
         vm.stopPrank();
 
-        strategyAMO = new MockStrategyAMO(address(vault));
+        strategyAMO = MockStrategyAMO(address(new MockStrategyTrad(address(vault))));
         strategyTrad = new MockStrategyTrad(address(vault));
         strategies.push(address(strategyAMO));
         strategies.push(address(strategyTrad));
